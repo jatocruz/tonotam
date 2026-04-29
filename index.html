@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISTEMA DE ARCHIVO - MEASI</title>
+    <style>
+        :root {
+            --term-green: #4ade80; /* Un verde un poco más suave y fosforescente */
+            --term-dark: #051500;
+            --term-bg: #0a0a0a;
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            background-color: var(--term-bg);
+            color: var(--term-green);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            text-shadow: 0 0 5px rgba(74, 222, 128, 0.5);
+        }
+
+        /* Scanline CRT Effect */
+        body::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 999;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        /* Layout */
+        #sidebar {
+            width: 300px;
+            border-right: 2px solid var(--term-green);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 10;
+            background: rgba(0,20,0,0.3);
+        }
+        #content {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto;
+            z-index: 10;
+            position: relative;
+        }
+
+        /* Typography & Elements */
+        h1, h2, h3 { border-bottom: 1px solid var(--term-green); padding-bottom: 5px; }
+        b, strong { color: #fff; text-shadow: 0 0 8px var(--term-green); }
+        
+        button.tab-btn {
+            display: block;
+            width: 100%;
+            background: transparent;
+            color: var(--term-green);
+            border: 1px dashed var(--term-green);
+            padding: 10px;
+            margin-bottom: 10px;
+            text-align: left;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        button.tab-btn:hover, button.tab-btn.active {
+            background: var(--term-green);
+            color: var(--term-bg);
+            text-shadow: none;
+        }
+
+        .tab-content { display: none; animation: flicker 0.15s 2; }
+        .tab-content.active { display: block; }
+
+        @keyframes flicker {
+            0% { opacity: 0.9; } 50% { opacity: 0.2; } 100% { opacity: 1; }
+        }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid var(--term-green); padding: 10px; text-align: left; }
+        th { background-color: var(--term-dark); }
+
+        /* APA 7 Bibliography */
+        .apa-ref { padding-left: 2em; text-indent: -2em; margin-bottom: 15px; line-height: 1.4; }
+
+        /* WIDGET STYLES GLOBALS */
+        .ascii-div { margin: 40px 0 10px 0; text-align: center; font-weight: bold; }
+        .widget-box { border: 1px solid var(--term-green); padding: 20px; position: relative; margin-bottom: 20px; background: rgba(0,10,0,0.5); }
+        .reset-btn { background: #002200; color: var(--term-green); border: 1px solid var(--term-green); padding: 5px 15px; font-family: inherit; cursor: pointer; margin-top: 15px; text-transform: uppercase; font-size: 0.8em; }
+        .reset-btn:hover { background: var(--term-green); color: black; }
+
+        /* --- TAB 1: BOOT SCREEN STYLES --- */
+        #boot-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        pre.ascii-art {
+            font-size: 14px;
+            line-height: 14px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+        .progress-container {
+            width: 400px;
+            height: 20px;
+            border: 2px solid var(--term-green);
+            margin: 30px auto 10px auto;
+            padding: 2px;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--term-green);
+            width: 0%;
+            animation: fillBar 2s ease-in-out forwards;
+        }
+        .loading-text { font-size: 1.1em; margin-bottom: 20px; }
+        .success-text { font-weight: bold; opacity: 0; animation: showSuccess 0.1s 2.2s forwards; }
+        
+        @keyframes fillBar { to { width: 100%; } }
+        @keyframes showSuccess { to { opacity: 1; } }
+
+        /* --- WIDGET SPECIFIC STYLES --- */
+        /* W1: Excavación */
+        #w1-text { font-size: 1.2em; word-break: break-all; cursor: crosshair; user-select: none; min-height: 60px; }
+        
+        /* W2: Dial Epistemológico Mejorado */
+input[type=range] { width: 100%; cursor: pointer; accent-color: var(--term-green); margin: 20px 0; }
+
+#w2-display { 
+    height: 120px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    border: 1px dashed var(--term-green); 
+    position: relative; 
+    overflow: hidden; 
+    background: #000;
+}
+
+.hex-stream {
+    position: absolute;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    line-height: 1.1;
+    color: var(--term-green);
+    opacity: 0.8;
+    text-align: center;
+    width: 100%;
+    pointer-events: none;
+}
+
+#w2-falling { 
+    position: absolute; 
+    transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1); 
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 10px var(--term-green);
+    z-index: 2;
+}        
+        /* W3: Radio */
+        #w3-canvas { width: 100%; height: 100px; background: #001100; border: 1px solid var(--term-green); }
+        #w3-secret { opacity: 0; transition: opacity 0.5s; font-weight: bold; text-align: center; margin-top: 10px;}
+        
+        /* W4: Radar */
+        #w4-radar { width: 300px; height: 300px; border-radius: 50%; border: 2px solid var(--term-green); position: relative; margin: 0 auto; overflow: hidden; background: radial-gradient(circle, #051500 0%, #000 100%); cursor: crosshair; }
+        .radar-line { position: absolute; width: 50%; height: 2px; background: var(--term-green); top: 50%; left: 50%; transform-origin: left center; animation: sweep 3s linear infinite; box-shadow: 0 0 15px var(--term-green); }
+        @keyframes sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        #w4-output { text-align: center; height: 30px; margin-top: 10px; font-weight: bold;}
+
+        /* W5: Magnetismo */
+        #w5-arena { height: 300px; border: 1px solid var(--term-green); position: relative; overflow: hidden; background: #000; }
+        .block { width: 130px; height: 40px; background: var(--term-dark); border: 1px solid var(--term-green); position: absolute; display: flex; justify-content: center; align-items: center; user-select: none; font-weight: bold;}
+        #block-prog { top: 50px; left: 50px; z-index: 2; transition: left 0.1s, top 0.1s;}
+        #block-cont { top: 200px; left: 200px; cursor: grab; background: var(--term-green); color: black; z-index: 3;}
+        #block-cont:active { cursor: grabbing; }
+        #w5-zone { position: absolute; bottom: 10px; right: 10px; width: 160px; height: 80px; border: 2px dashed var(--term-green); display: flex; align-items: center; justify-content: center; text-align: center; z-index: 1;}
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--term-bg); border-left: 1px solid var(--term-green); }
+        ::-webkit-scrollbar-thumb { background: var(--term-green); }
+
+/* --- ESTILOS PARA IMÁGENES Y PIES DE FOTO --- */	
+        figure.terminal-img {
+            margin: 25px 0;
+            padding: 15px;
+            border: 1px dashed var(--term-green);
+            background: rgba(0, 15, 0, 0.4);
+            text-align: center;
+        }
+        figure.terminal-img img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid var(--term-green);
+            display: inline-block;
+        }
+        figure.terminal-img figcaption {
+            margin-top: 12px;
+            font-size: 0.85em;
+            color: var(--term-green);
+            opacity: 0.8; /* Lo hace un poco más tenue que el texto principal */
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+/* --- SUB-TABS BITÁCORA STYLES --- */
+        .sub-tab-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed var(--term-green);
+            padding-bottom: 15px;
+        }
+        button.sub-tab-btn {
+            background: transparent;
+            color: var(--term-green);
+            border: 1px solid var(--term-green);
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            text-shadow: 0 0 5px rgba(74, 222, 128, 0.5);
+        }
+        button.sub-tab-btn:hover, button.sub-tab-btn.active {
+            background: var(--term-green);
+            color: var(--term-bg);
+            text-shadow: none;
+            font-weight: bold;
+        }
+        .sub-tab-content { display: none; animation: flicker 0.15s 2; line-height: 1.6; }
+        .sub-tab-content.active { display: block; }
+
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2 style="font-size: 1.2em;">TERMINAL MEASI<br>ARCHÉ v2.4</h2>
+        <button class="tab-btn active" onclick="openTab('t1')">1. Acceso</button>
+        <button class="tab-btn" onclick="openTab('t2')">2. Definiciones</button>
+        <button class="tab-btn" onclick="openTab('t3')">3. Posturas Teóricas</button>
+        <button class="tab-btn" onclick="openTab('t4')">4. Metodologías</button>
+        <button class="tab-btn" onclick="openTab('t5')">5. Objetos y Fuentes</button>
+        <button class="tab-btn" onclick="openTab('t6')">6. Núcleos de Debate</button>
+        <button class="tab-btn" onclick="openTab('t7')">7. Relaciones y Limites</button>
+        <button class="tab-btn" onclick="openTab('t8')">8. Sala Arché [LAB]</button>
+        <button class="tab-btn" onclick="openTab('t9')">9. Bibliografía</button>
+<button class="tab-btn" onclick="openTab('t10')">10. Bitácora de Sesiones</button>
+    </div>
+
+    <div id="content">
+        <div id="t1" class="tab-content active" style="height: 100%;">
+            <div id="boot-screen">
+<pre class="ascii-art">
+███╗   ███╗███████╗ █████╗ ███████╗██╗
+████╗ ████║██╔════╝██╔══██╗██╔════╝██║
+██╔████╔██║█████╗  ███████║███████╗██║
+██║╚██╔╝██║██╔══╝  ██╔══██║╚════██║██║
+██║ ╚═╝ ██║███████╗██║  ██║███████║██║
+╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝
+</pre>
+                <div class="loading-text">METODOLOGÍA DE ESTADO DEL ARTE SEMIAUTOMÁTICO INTEGRADO DEL PROFESOR GUBERNEY MUÑETÓN-SANTA</div>
+		<div class="loading-text">APLICADA AL ANÁLISIS DE FUENTES SOBRE LA ARQUEOLOGÍA DE MEDIOS</div>
+                <div class="loading-text">INVESTIGADOR: J. ANDRÉS TORRES CRUZ</div>
+                <div class="loading-text">DOCTORADO EN COMUNICACIONES Y NARRATIVAS</div>
+		<div class="loading-text">UNIVERSIDAD DE ANTIOQUIA</div>
+		<div class="loading-text">ABRIL 2026</div>
+                <div class="progress-container">
+                    <div class="progress-bar"></div>
+                </div>
+                
+                <div class="loading-text">SINCRONIZANDO 47 FUENTES: 100%</div>
+                <div class="success-text">>>> ACCESO CONCEDIDO: METODOLOGÍA MEASI ACTIVA</div>
+            </div>
+        </div>
+
+        <div id="t2" class="tab-content">
+            <h2>2. Definiciones</h2>
+            <p>La matriz revela que la gran mayoría de los 47 textos no ofrece una definición cerrada y universal de la Arqueología de Medios, sino que la operacionalizan como práctica. Las definiciones más explícitas proceden de tres tradiciones:</p>
+            <p><strong>Tradición foucaultiana-discursiva:</strong> Huhtamo la define como "a critical practice that excavates media-cultural evidence for clues about neglected, misrepresented, and/or suppressed aspects of both media's past(s) and their present"; Elsaesser señala que su necesidad es "read [media history] against the grain".</p>
+            <p><strong>Tradición materialista-técnica (Ernst/Kittler):</strong> Ernst distingue que la Medienarchäologie no es primariamente excavación de tecnologías pasadas, sino investigación de arché —los orígenes y condiciones de posibilidad de los medios en sentido sistemático—: "Die arché meint Ursprünge der Medien sowohl in einem zeitlichen wie in einem systematischen Sinn".</p>
+            <p><strong>Tradición anarqueológica (Zielinski):</strong> Se define como "anarchaeological expedition" que rechaza narrativas progresivas y teleológicas, enfocándose en "constelaciones olvidadas" y "fortuitous finds" en lugar de orígenes o continuidad.</p>
+            <p>Parikka articula una síntesis operativa al afirmar que "Media archaeology is not a school of thought or a specific technique, but is an emerging attitude and cluster of tactics" y que "exists somewhere between materialist media theories and the insistence on the value of the obsolete and forgotten" (Parikka, 2015)</p>
+            
+            <h3>Tensiones y Divergencias Conceptuales</h3>
+            <p>Un patrón central es la tensión entre dos modalidades del campo:</p>
+            <table>
+                <tr><th>Modalidad</th><th>Énfasis</th><th>Autores clave</th></tr>
+                <tr><td>Discursivo-histórica</td><td>Archivo, narrativas alternativas, topoi</td><td>Huhtamo, Elsaesser, Foucault</td></tr>
+                <tr><td>Materialista-técnica</td><td>Señales, operaciones, tiempo-crítico</td><td>Ernst, Kittler, Siegert</td></tr>
+                <tr><td>Anarqueológica</td><td>Heterogeneidad, deep time, variantología</td><td>Zielinski, Gould</td></tr>
+                <tr><td>Decolonial</td><td>Modernidad/colonialidad, archivo ausente</td><td>Sengupta, Mignolo, Quijano</td></tr>
+                <tr><td>Experimental/práctica</td><td>Re-enactment, reconstrucción, "second originals"</td><td>Fickers, Guez, Grau</td></tr>
+            </table>
+            <p>Natale sintetiza bien esta pluralidad: "there is not just one 'media archaeology,' but several of them". Goddard y otros refuerzan esto llamándola una "travelling discipline" o incluso "indiscipline".</p>
+
+            <h3>Conceptos Parientes Recurrentes (Columna 6)</h3>
+            <ul>
+                <li><strong>Deep time / Tiempo profundo:</strong> Presente en Zielinski, Parikka y Burbano; orienta el análisis hacia orígenes geofísicos y temporalidades no-humanas.</li>
+                <li><strong>Anarchaeology / Anarquaeología:</strong> Concepto zielinskiano retomado por Goddard y la tradición del variantology, que privilegia las derivas y callejones sin salida.</li>
+                <li><strong>Diagrama materialista / Materialist media diagrammatics:</strong> Parikka lo presenta como horizonte hacia el cual tiende la arqueología de medios.</li>
+                <li><strong>Medios muertos / Dead media:</strong> Concepto de Bruce Sterling retomado en múltiples fuentes.</li>
+                <li><strong>Re-enactment:</strong> Emerge con fuerza en la tradición experimental como metodología.</li>
+                <li><strong>Técnicas culturales (Kulturtechniken):</strong> Concepto asociado a la teoría alemana post-Kittler.</li>
+                <li><strong>Medios imaginarios / Imaginary media:</strong> Desarrollado por Huhtamo y Kluitenberg.</li>
+            </ul>
+
+            <h3>Divergencias Geopolíticas y Ampliaciones del Campo</h3>
+            <p>Un hallazgo relevante es la aparición de perspectivas que desafían el eurocentrismo del campo:<br>
+            La <strong>arqueología decolonial</strong> de Sengupta propone investigar "how coloniality/modernity may have informed many of those epistemological conditions".<br>
+            La <strong>perspectiva latinoamericana</strong> de Burbano abre el campo hacia "alternative media technologies".<br>
+            El texto brasileño de Telles propone operaciones de "des-escrever, escrever, descrever e re-escrever" como metodología de "hack historiográfico".</p>
+        </div>
+
+        <div id="t3" class="tab-content"><h2>3. Posturas Teóricas y Epistemológicas</h2><p>El análisis revela un campo de tensiones productivas entre distintas orientaciones epistemológicas que comparten, sin embargo, un núcleo anti-teleológico, materialista y foucaultiano.</p>
+        <h3>1. Cluster Foucaultiano-Materialista Nuclear</h3>
+        <ul>
+            <li><strong>Zielinski (Anarchaeology / Variantología).</strong> Postura anarquaeológica y no-lineal.</li>
+            <li><strong>Parikka — Operative Media Archaeology.</strong> Postura materialista, foucaultiana, no hermenéutica y poshumanista.</li>
+            <li><strong>Ernst — Digital Memory and the Archive.</strong> Postura materialista, centrada en el primado del registro de la máquina.</li>
+            <li><strong>Ernst — Medien Definitionen.</strong> Investiga los orígenes y condiciones de posibilidad.</li>
+            <li><strong>Ernst — Medienarchäologische Blick.</strong> Subraya que el mirar arqueológico no ve imágenes sino datos.</li>
+            <li><strong>Huhtamo & Parikka — Media Archaeology.</strong> Postura anti-teleológica, crítica de narrativas canonizadas.</li>
+        </ul>
+        <h3>2. Cluster Posthermenéutico y Técnico-a-Priori</h3>
+        <ul><li><strong>Parikka — Conditions of Media's Possibility.</strong> Desplaza la ontología hacia operaciones ónticas.</li><li><strong>Fickers & Weber — Experimental Media Archaeology.</strong> Material, experimental, sensorial y reflexiva.</li></ul>
+        <h3>3. Cluster Genealógico y Foucaultiano Ampliado</h3>
+        <ul><li><strong>Packer — The Conditions of Media's Possibility.</strong> Foucaultiana, posestructural y anti-teleológica.</li><li><strong>Geoghegan — After Kittler.</strong> Genealógica, praxeológica y poskittleriana.</li><li><strong>Schröter — Einführung Medienarchäologie.</strong> Subraya la heterogeneidad y contingencia.</li></ul>
+        <h3>4. Cluster Materialista-Experimental y de Reconstrucción</h3>
+        <ul><li><strong>Stricot — Media Archaeology and Reconstruction.</strong> Centrada en el proceso antes que en el resultado.</li><li><strong>Zielinski — Technological Arts Preservation.</strong> Poiética, cognitivo-especulativa y material.</li></ul>
+        <h3>5. Cluster Nuevo Materialismo y Geofísico</h3>
+        <ul><li><strong>Parikka — Geology of Media.</strong> Nuevo materialismo posthumanista y geofísico.</li><li><strong>Goddard.</strong> Articula arqueología con ecología de medios.</li></ul>
+        <h3>6. Cluster Anti-Progresista y Crítico-Cultural</h3><p><strong>Hertz, Parikka, Morgan, Elsaesser, Natale.</strong> Posturas críticas de la obsolescencia programada y atentas a las crisis de causalidad.</p>
+        <h3>7. Cluster Decolonial y Crítico de la Geopolítica</h3><p><strong>Sengupta y Burbano.</strong> Cuestionan el sesgo occidental y exploran tecnologías marginales del Sur Global.</p>
+        <h3>8. Cluster del Reenactment y la Historia Performativa</h3><p><strong>Franco, Temkin, Siegmund, Traub.</strong> Historia performativa, centrada en la legibilidad algorítmica y la memoria corporal.</p>
+        <h3>9. Clusters Adicionales (Algorítmica, Sonido, Visualidad, Topoi)</h3><p>Incluye los trabajos de <strong>Link, Sterne, Cedeño y Huhtamo</strong> que abordan desde la reconstrucción del ciclo de reloj hasta topoi culturales.</p>
+        <h3>Síntesis de Patrones y Divergencias:</h3><ul><li><strong>Anti-teleología generalizada.</strong></li><li><strong>Materialismo técnico de diverso grado.</strong></li><li><strong>Herencia foucaultiana ubicua.</strong></li></ul>
+        </div>
+
+        <div id="t4" class="tab-content"><h2>4. Metodologías Dominantes</h2><p>El análisis revela una tensión productiva entre metodologías textuales-discursivas, experimentales-reconstructivas y teórico-genealógicas.</p><ul><li><strong>Reconstrucción y retroingeniería:</strong> Ernst, Link, Burbano, Stricot.</li><li><strong>Re-enactment como heurística:</strong> Fickers & Weber, Burbano.</li><li><strong>Genealogía y lectura de archivo:</strong> Huhtamo, Elsaesser, Sterne, Schröter.</li></ul><p><strong>Divergencias clave:</strong> Objeto discursivo vs. objeto operativo; Escala del objeto; Obsolescencia humana vs. técnica.</p></div>
+        <div id="t5" class="tab-content"><h2>5. Objetos de Estudio y Fuentes</h2><p>Extraordinaria heterogeneidad: desde archivos medievales hasta micrografías OLED.</p><ul><li><strong>Predominio de lo técnico-material.</strong></li><li><strong>La obsolescencia como criterio constitutivo.</strong></li><li><strong>Escalas extremadamente heterogéneas.</strong></li></ul><p><strong>Patrones en las fuentes:</strong> Primacía del archivo técnico, Corpus heterodoxos, La ausencia como corpus (Sengupta).</p></div>
+        <div id="t6" class="tab-content"><h2>6. Núcleos de Debate</h2><p>Cuatro ejes estructurantes:</p><ol><li><strong>Progreso lineal vs. no-linealidad histórica.</strong></li><li><strong>Materialidad técnica vs. discurso/semántica.</strong></li><li><strong>Centro hegemónico vs. genealogías periféricas o decoloniales.</strong></li><li><strong>Archivo/preservación vs. reactivación/reenactment.</strong></li></ol><p><strong>Hallazgo transversal relevante:</strong> Existe una tensión irresuelta entre la diagramática materialista de Ernst y la diversificación del objeto (Sengupta, Burbano, Huhtamo). Esta tensión es su productividad epistémica central.</p></div>
+        <div id="t7" class="tab-content"><h2>7. Relaciones Interdisciplinarias y Limitaciones</h2><p>Tres modalidades:</p><ol><li><strong>Polo técnico-científico:</strong> Hacia matemáticas, física, ingeniería.</li><li><strong>Polo humanístico-genealógico:</strong> Hacia filosofía, historia, estudios visuales.</li><li><strong>Polo práctico-experimental:</strong> Hacia archivística, museología, investigación-creación.</li></ol><p><strong>Limitaciones recurrentes:</strong> Ausencia de economía política, Sesgo occidental/eurocéntrico, Indefinición metodológica, Fragilidad archivística y pérdida material.</p></div>
+
+        <div id="t8" class="tab-content">
+            <h2>8. Sala Arché [LAB]</h2>
+            
+            <div class="ascii-div">//--- EXPERIMENTO 01: EXCAVACIÓN DE TEXTO ---//</div>
+            <div class="widget-box">
+                <p>Mantén pulsado o arrastra el cursor sobre el ruido para desencriptar:</p>
+                <div id="w1-text">0x8A 1F 99 CC A1 4D... [ESPERANDO INTERACCIÓN]</div>
+                <button class="reset-btn" id="btn-reset-w1">Restaurar Ruido</button>
+            </div>
+
+            <div class="ascii-div">//--- EXPERIMENTO 02: DIAL EPISTEMOLÓGICO ---//</div>
+<div class="widget-box">
+    <p style="display:flex; justify-content:space-between;">
+        <span>Ruido Computacional</span> 
+        <span>Sentido Orgánico</span>
+    </p>
+    <input type="range" id="w2-slider" min="0" max="100" value="0">
+    <div id="w2-display">
+        <div id="w2-hex" class="hex-stream"></div>
+        <div id="w2-falling" style="opacity:0; transform: translateY(-20px) scale(0.9); filter: blur(5px);">
+            Laboratorio Vivo y Orgánico
+        </div>
+    </div>
+    <button class="reset-btn" id="btn-reset-w2">Reiniciar Dial</button>
+</div>
+            <div class="ascii-div">//--- EXPERIMENTO 03: SINTONIZADOR ARQUEOGRÁFICO ---//</div>
+            <div class="widget-box">
+                <p>Sintoniza la frecuencia <strong>104.2</strong> para limpiar el ruido (Arqueografía Ernstiana):</p>
+                <input type="range" id="w3-slider" min="80" max="120" step="0.1" value="80">
+                <span id="w3-freq" style="font-weight:bold;">80.0 MHz</span>
+                <canvas id="w3-canvas"></canvas>
+                <div id="w3-secret">"El archivo no narra, el archivo cuenta y transmite señales."</div>
+                <button class="reset-btn" id="btn-reset-w3">Desintonizar</button>
+            </div>
+
+            <div class="ascii-div">//--- EXPERIMENTO 04: RADAR DE TOPOSFORSCHUNG ---//</div>
+            <div class="widget-box">
+                <p>Explora el vacío. Busca los Topoi (Mueve el mouse sobre el radar):</p>
+                <div id="w4-radar">
+                    <div class="radar-line"></div>
+                </div>
+                <div id="w4-output">[ESCANENADO VACÍO]</div>
+                <button class="reset-btn" id="btn-reset-w4">Limpiar Pantalla</button>
+            </div>
+
+            <div class="ascii-div">//--- EXPERIMENTO 05: COLISIÓN MAGNÉTICA ---//</div>
+            <div class="widget-box">
+                <p>Arrastra la 'Contingencia' a la 'Zona de Excavación'. Cuidado con la repulsión del 'Progreso'.</p>
+                <div id="w5-arena">
+                    <div id="block-prog" class="block">Progreso</div>
+                    <div id="block-cont" class="block">Contingencia</div>
+                    <div id="w5-zone">ZONA DE EXCAVACIÓN</div>
+                </div>
+                <div id="w5-result" style="margin-top:10px; color:var(--term-green); font-weight:bold; display:none; text-align:center;">
+                    [+] "La historia es una constelación de accidentes"
+                </div>
+                <button class="reset-btn" id="btn-reset-w5">Restablecer Bloques</button>
+            </div>
+
+        </div>
+
+      <div id="t9" class="tab-content">
+            <h2>9. Bibliografía</h2>
+            <div class="apa-ref">[Autor desconocido]. (s.f.). An archaeology of algorithmic artefacts. [Fuente desconocida].</div>
+            <div class="apa-ref">[Autor desconocido]. (s.f.). Opening up the black boxes: Media archaeology, anarchaeology and media materiality. [Fuente desconocida].</div>
+            <div class="apa-ref">[Autor desconocido]. (s.f.). Programming degree zero: A genealogy of Turing’s machines and algorithms. [Fuente desconocida].</div>
+            <div class="apa-ref">[Autor desconocido]. (s.f.). There must be an angel: On the beginnings of the arithmetics of rays. [Fuente desconocida].</div>
+            <div class="apa-ref">[Autor desconocido]. (s.f.). while(true) On the fluidity of signs in Hegel, Gödel, and Turing. [Fuente desconocida].</div>
+            <div class="apa-ref">Baldacci, C., & Franco, S. (s.f.). Represencing performance, dance, and visual art. En On reenactment: Concepts, methodologies, tools (pp. ix–xiv). [Editorial desconocida].</div>
+            <div class="apa-ref">Burbano, A. (2009). Between punched film and the first computers, the work of Konrad Zuse. En Re:live Media Art Histories 2009 conference proceedings (pp. 12–15).</div>
+            <div class="apa-ref">Burbano, A. (s.f.). Bioacoustics and photography, Brazil, 1832. En Different engines: Media technologies from Latin America (pp. 17–42). https://doi.org/10.4324/9781003172789-3</div>
+            <div class="apa-ref">Burbano, A. (s.f.). Introduction. En Different engines: Media technologies from Latin America (pp. 1–13). https://doi.org/10.4324/9781003172789-1</div>
+            <div class="apa-ref">Burbano, A. (s.f.). The color wheel of television history, Mexico, 1939. En Different engines: Media technologies from Latin America (pp. 43–77). https://doi.org/10.4324/9781003172789-4</div>
+            <div class="apa-ref">Cedeño Montaña, R. (2019). Encoding color: Between perception and signal. En B. Bock von Wülfingen (Ed.), Science in color: Visualizing achromatic knowledge (pp. 99–113). Walter de Gruyter.</div>
+            <div class="apa-ref">Cedeño Montaña, R. (2022). Colour films: Stencils, additions, and subtractions. En J. Schröter & T. A. Heilmann (Eds.), Friedrich Kittler. Neue Lektüren (pp. 195–213). Springer VS. https://doi.org/10.1007/978-3-658-35324-7_12</div>
+            <div class="apa-ref">Cedeño Montaña, R. (s.f.). Color: Microscopic geometries and utopian gamut expansions. En [Título original desconocido]. [Editorial desconocida].</div>
+            <div class="apa-ref">Cedeño Montaña, R., & Vagt, C. (2018). Constructing the invisible - Computer graphics and the end of optical media. communication +1, 7(1), Artículo 2. https://scholarworks.umass.edu/cpo/vol7/iss1/2</div>
+            <div class="apa-ref">Chun, W. H. K. (2008). The enduring ephemeral, or the future is a memory. Critical Inquiry, 35.</div>
+            <div class="apa-ref">DeMarinis, P. (s.f.). Erased dots and rotten dashes, or how to wire your head for a preservation. En [Título original desconocido]. [Editorial desconocida].</div>
+            <div class="apa-ref">Elsaesser, T. (2004). The new film history as media archaeology. Cinémas: Journal of Film Studies, 14(2-3), 75–117. https://doi.org/10.7202/026005ar</div>
+            <div class="apa-ref">Elsaesser, T. (2016). Media archaeology as symptom. New Review of Film and Television Studies, 14(2), 181–215. https://doi.org/10.1080/17400309.2016.1146858</div>
+            <div class="apa-ref">Ernst, W. (2004). Der medienarchäologische Blick. En H. Segeberg (Ed.), Die Medien und ihre Technik: Theorien - Modelle - Geschichte. Schüren.</div>
+            <div class="apa-ref">Fickers, A., & van den Oever, A. (2022). Doing experimental media archaeology: Theory. Walter de Gruyter. https://doi.org/10.1515/9783110799774</div>
+            <div class="apa-ref">Fickers, A., & van den Oever, A. (s.f.). Experimental media archaeology: A plea for new directions. En [Título original desconocido] (pp. 272–278). [Editorial desconocida].</div>
+            <div class="apa-ref">Franco, F., & Temkin, D. (s.f.). Reenacting human-algorithm relations: Computational art between today and yesterday. En On reenactment: Concepts, methodologies, tools (pp. 137–146). [Editorial desconocida].</div>
+            <div class="apa-ref">Geoghegan, B. D. (2013). After Kittler: On the cultural techniques of recent German media theory. Theory, Culture & Society, 30(6), 66–82. https://doi.org/10.1177/0263276413488962</div>
+            <div class="apa-ref">Goddard, M. (2014). Opening up the black boxes: Media archaeology, ‘anarchaeology’ and media materiality. New Media & Society, 1–16. https://doi.org/10.1177/1461444814532193</div>
+            <div class="apa-ref">Hertz, G. (s.f.). Art after new media: Exploring black boxes, tactics and archaeologies. Leonardo Electronic Almanac, 17(2), 202–213.</div>
+            <div class="apa-ref">Huhtamo, E. (s.f.). Dismantling the fairy engine: Media archaeology as topos study. En [Título original desconocido]. [Editorial desconocida].</div>
+            <div class="apa-ref">Huhtamo, E., & Parikka, J. (s.f.). Introduction: An archaeology of media archaeology. En [Título original desconocido]. [Editorial desconocida].</div>
+            <div class="apa-ref">Kluitenberg, E. (s.f.). On the archaeology of imaginary media. En [Título original desconocido]. [Editorial desconocida].</div>
+            <div class="apa-ref">Morgan, D. (2022). Introduction: Media archaeology and the resources of film studies. boundary 2, 49(1), 5–23. https://doi.org/10.1215/01903659-9615375</div>
+            <div class="apa-ref">Natale, S. (2012). Understanding media archaeology. Canadian Journal of Communication, 37(3), 523–527. https://doi.org/10.22230/cjc.2012v37n3a2577</div>
+            <div class="apa-ref">Packer, J. (2013). The conditions of media’s possibility: A Foucauldian approach to media history. En J. Nerone (Ed.), The international encyclopedia of media studies, Volume I: Media history and the foundations of media studies (pp. 1–34). Blackwell Publishing Ltd.</div>
+            <div class="apa-ref">Parikka, J. (2011). Operative media archaeology: Wolfgang Ernst’s materialist media diagrammatics. Theory, Culture & Society, 28(5), 52–74. https://doi.org/10.1177/0263276411411496</div>
+            <div class="apa-ref">Parikka, J. (2013). Archival media theory: An introduction to Wolfgang Ernst’s media archaeology. En W. Ernst, Digital memory and the archive (pp. 1–22). University of Minnesota Press.</div>
+            <div class="apa-ref">Parikka, J. (2015). A geology of media. University of Minnesota Press.</div>
+            <div class="apa-ref">Parikka, J. (s.f.). Arqueología de los medios: cuestionando lo Nuevo en el arte medial. [Revista desconocida]. Recuperado de a-desk.org</div>
+            <div class="apa-ref">Parikka, J., & Hertz, G. (s.f.). CTheory interview: Archaeologies of media art.CTheory. https://journals.uvic.ca/index.php/ctheory/article/view/14750/5621</div>
+            <div class="apa-ref">Schröter, J. (2020, 10 de julio). Jens Schröter zur Medienarchäologie der digitalen Medien. Zeitschrift für Medienwissenschaft, Open-Media-Studies-Blog.</div>
+            <div class="apa-ref">Sengupta, R. (2021). Towards a decolonial media archaeology: The absent archive of screenwriting history and the obsolete munshi. Theory, Culture & Society, 38(1), 3–26. https://doi.org/10.1177/0263276420930276</div>
+            <div class="apa-ref">Siegert, B. (2013). Cultural techniques: Or the end of the intellectual postwar era in German media theory. Theory, Culture & Society, 30(6), 48–65. https://doi.org/10.1177/0263276413488963</div>
+            <div class="apa-ref">Siegmund, G., & Traub, S. (s.f.). Has reenactment reached an end? En On reenactment: Concepts, methodologies, tools (pp. 147–158). [Editorial desconocida].</div>
+            <div class="apa-ref">Sterne, J. (2012). MP3: The meaning of a format. Duke University Press.</div>
+            <div class="apa-ref">Sterne, J. (2012). Perceptual technics. En MP3: The meaning of a format (pp. 33–60). Duke University Press.</div>
+            <div class="apa-ref">Stricot, M. (2017). Retro-engineering and alternative histories: Possible towards media archaeological reconstruction. Leonardo, 50(2), 192–193. https://doi.org/10.1162/LEON_a_01388</div>
+            <div class="apa-ref">Telles, M. (2017, septiembre). A(s) Arqueologia(s) das Mídias em Quatro Teses. Trabajo presentado en el 40º Congresso Brasileiro de Ciências da Comunicação, Curitiba, PR, Brasil.</div>
+            <div class="apa-ref">Theorie-Konvolut: Mediendefinitionen, -Archäologie. (s.f.). [Fuente desconocida].</div>
+            <div class="apa-ref">Zielinski, S. (2006). Deep time of the media: Toward an archaeology of hearing and seeing by technical means (G. Custance, Trad.). MIT Press. (Obra original publicada en 2002).</div>
+            <div class="apa-ref">Zielinski, S. (s.f.). Prospective archaeology. En [Título original desconocido] (pp. 29–67). [Editorial desconocida].</div>
+        </div>
+
+            </div>
+
+<div id="t10" class="tab-content">
+            <h2>10. Bitácora de Sesiones</h2>
+            <div class="sub-tab-container">
+                <button class="sub-tab-btn active" onclick="openSubTab('s1', event)">Sesión 1</button>
+                <button class="sub-tab-btn" onclick="openSubTab('s2', event)">Sesión 2</button>
+                <button class="sub-tab-btn" onclick="openSubTab('s3', event)">Sesión 3</button>
+                <button class="sub-tab-btn" onclick="openSubTab('s4', event)">Sesión 4</button>
+                <button class="sub-tab-btn" onclick="openSubTab('s5', event)">Sesión 5</button>
+            </div>
+
+            <div id="s1" class="sub-tab-content active">
+                <h3>La caja negra algorítmica y la pregunta por lo invisible</h3>
+                <p>Hay algo perturbador en comenzar una sesión hablando de cajas negras. No como metáfora, sino como condición material. Llegué al seminario con la sensación de quien sabe que hay algo operando por debajo de la superficie -un zumbido, un proceso- que aún no se puede tocar. Para mi, la genealogía de desarrollo del Deep Learning que recorrimos no compromete una historia de éxitos tecnológicos acumulativa porque se parece más a una serie de capas sedimentadas que se presionan entre sí. Es decir, que esta revolución no llegó de golpe por un proceso evolutivo, sino que ha venido fermentándose desde la profundidad del pasado, o como “variaciones” que escalan tiempos profundos según el an-arqueólogo y alquimista de medios Siegfried Zielinski. El tiempo tecnológico no avanza; se acumula, se pliega, se entierra y reaparece. Las redes neuronales profundas son, en ese sentido, un estrato más uno que procesa los estratos anteriores sin saberlo.</p>
+
+<figure class="terminal-img">
+    <img src="s1_i1.png" alt="Deep Time y Caja Negra intervenida">
+    <figcaption>// FIG 01: Imagen realizada con IA.</figcaption>
+</figure>
+
+                <p>La opacidad me inquieta como investigador, pero me convoca como artista. Si entre el input y el output existe un territorio oscuro donde la máquina "decide", entonces ese territorio es precisamente donde quiero intervenir. ¿Puede una instalación sonora, audio-visual, o multimedial hacer percibible ese proceso? ¿Puede el espacio expositivo donde conviven el cuerpo del espectador y el cuerpo de la máquina volver sensible lo que el algoritmo oculta? La práctica artística como instrumento de apertura. Una especie de bisturí oblicuo. Entonces la noción de Zombie Media, o Medios Zombies cobra una densidad nueva. Si los modelos de IA reciclan y recontextualizan el archivo medial preexistente, entonces los medios no mueren: son reanimados, procesados, vaciados de su historicidad y devueltos como simulacro funcional.</p>
+
+<figure class="terminal-img">
+    <img src="s1_i2.png" alt="World of Data">
+    <figcaption>// FIG 02: Imagen realizada con IA.</figcaption>
+</figure>
+
+                <p>Eso tiene consecuencias éticas y estéticas que no puedo ignorar. Me quedé pensando en la imagen del "investigador robot" atravesando la Biblioteca de Babel. Es una figura hermosa y ominosa a la vez: procesa todo, pero no recuerda nada en el sentido que nosotros somos los que recurdan. No hay experiencia, solo correlación. Por eso la metodología MEASI me parece estratégicamente valiosa: no para delegar la interpretación, sino para usar la IA como superficie de refracción, o como un espejo que devuelve el objeto de estudio ligeramente desplazado, mostrando ángulos que la lectura directa no alcanza.</p>
+            </div>
+
+            <div id="s2" class="sub-tab-content">
+                <h3>El espejo y la máquina de clasificación</h3>
+                <p>Dos documentales. Dos maneras de mirar la misma máquina. Y en el medio, yo tratando de ntender desde qué lugar me sitúo -no solo como investigador, sino como alguien que piensa en las máquinas como sujetos del arte. Coded Bias llega como un golpe que ya esperabas pero que duele igual. Le pone cuerpo, dirección y código postal a la violencia algorítmica. El sistema de reconocimiento facial que falla sistemáticamente en rostros negros es la sedimentación de décadas de exclusión estructural convertida en herramienta de vigilancia. El Sisbén IV, que analizamos en clase, opera con la misma lógica: la vulnerabilidad social reducida a puntaje, la complejidad de una vida traducida a variable. El ruido estadístico como la malinterpretación de un error puede dejar a una familia por fuera. En este lugar, el algoritmo produce la realidad, la delimita, y decide quién entra y quién no en el campo de lo atendible.</p>
+
+                <p>Eso me ancla. Me recuerda que trabajar con estas tecnologías sin asumir una postura política es ya, en sí mismo, una postura política. Pero AlphaGo hace algo distinto. No me alarma: me desestabiliza de otra manera, más sutil y quizás más perturbadora para mi práctica. Lo que hace la máquina en el tablero de Go es mostrar que hay movimientos posibles que miles de años de tradición humana nunca consideraron. Así se siente que ql algoritmo no aplana la complejidad sino que la amplía. Le abre una grieta a la intuición y demuestra que lo que llamábamos conocimiento era, en parte, costumbres o ¿costumbres con sesgos? Y ahí es donde mi propia relación con máquinas entran en la discusión.</p>
+
+<figure class="terminal-img">
+    <img src="s2_i1.jpg" alt="Experimento de Música Visual Chromara">
+    <figcaption>// FIG 03: Luz y Color en movimiento durante el experimento Chromara, Noviembre 2026. Lab1, Doctorado en Comunicaciones y Narrativas.</figcaption>
+</figure>
+
+
+
+                <p>Cuando trabajo con Chromara, esa arquitectura cinética donde la luz, el color y el movimiento se articulan como un mismo lenguaje sensorial, no pienso en la máquina como ejecutora de instrucciones. La pienso como una entidad con presencia expresiva propia. Es como si el mecanismo no ilustrara una idea previa, sino que la genera en tiempo real, a través del movimiento, la refracción, la vibración, y otros fundamentos físicos de la luz. También la máquina tiene una especie de agencia estética que no controlo completamente, y esa pérdida de control es productiva. Es el equivalente a la jugada 78 de Sedol: el momento en que algo ocurre que ninguno de los dos, ni yo ni la máquina, habíamos anticipado.</p>
+
+<figure class="terminal-img">
+    <img src="s2_i2.jpg" alt="Experimento de Música Visual Chromara">
+    <figcaption>// FIG 04: Experimento de Música Visual Chromara, DCN, Noviembre 2026.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s2_i3.jpg" alt="Experimento de Música Visual Chromara">
+    <figcaption>// FIG 05: Experimento de Música Visual Chromara, DCN, Noviembre 2026.</figcaption>
+</figure>
+
+
+
+                <p>En otra obra de mi autoría, Cámara Orafónica, se radicaliza esa pregunta. La obra conjuga la materialidad del pasado, el cuerpo de una cámara de fuelle antiguo, con su textura, su acordeón plegable, su lógica óptica preindustrial, y con un algoritmo de control ocular contemporáneo que lee la mirada del espectador y, desde ella, regula los sonidos y las imágenes de la instalación. La cámara registra en la audio-escucha. Y lo que escucha es la atención. El ojo del visitante se convierte en el umbral entre el archivo histórico del dispositivo y la computación viva del algoritmo. Hay ahí una tensión temporal que no se resuelve y no debe resolverse. Lo que me interesa de esa tensión, pensándola ahora desde la discusión de la sesión, es que Cámara Orafónica no delega la experiencia a la máquina ni la retiene completamente en el humano. Opera en el entre. El algoritmo de seguimiento ocular no decide por el espectador: responde a él, lo traduce, lo convierte en parámetro. Pero esa traducción genera una forma de sensibilidad que ninguno de los dos, espectador o máquina, podría producir por separado. Es un modo de cognición distribuida donde la máquina no amplifica ni reemplaza, sino que revela algo que la mirada sola no sabría ver de sí misma.</p>
+
+
+<figure class="terminal-img">
+    <img src="s2_i4.jpg" alt="Instalación Interactiva Cámara Orafónica">
+    <figcaption>// FIG 06: Instalación Audio-Visual Interactiva Cámara Orafónica, Vartex 11, Noviembre 2023.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s2_i5.jpg" alt="Instalación Interactiva Cámara Orafónica">
+    <figcaption>// FIG 07: Cámara Orafónica, Vartex 11, Noviembre 2023.</figcaption>
+</figure>
+
+
+
+                <p>Eso es lo que separa este tipo de práctica del determinismo algorítmico que denuncia Coded Bias. No se trata de que la máquina decida, sino de que la máquina haga visible una dimensión de la experiencia que permanecería opaca sin ella. El algoritmo como instrumento de refracción, no de clasificación. El arco emocional de Sedol, del terror existencial a la resiliencia y la fascinación, ilustra la postura que busco habitar: usar la IA y la computación no para competir ni para automatizar, sino como superficie que me obliga, como artista e investigador, a moverme más allá de mis propios límites históricos. Las máquinas que construyo no son herramientas neutrales ni oráculos. Son artefactos con presencia, con historia material, con modos propios de sensibilidad que interpelan al cuerpo del espectador de maneras que el texto o la imagen estática no pueden. ¿Cuándo la máquina es un espejo que expande, y cuándo es un filtro que oprime? Chromara y Cámara Orafónica son, en ese sentido, mis laboratorios para ensayar respuestas que no puedo formular solo con palabras.</p>
+            </div>
+
+
+
+            <div id="s3" class="sub-tab-content">
+                <h3>Arquitectura del lenguaje y control de la máquina</h3>
+                <p>La ingeniería de prompts, entendida en su dimensión profunda, no consiste en redactar instrucciones con cortesía y claridad. Consiste en diseñar la estructura de un proceso: definir roles, establecer jerarquías de información, anticipar el tipo de razonamiento que se quiere provocar. Es, en el fondo, si lo comparo con mi experiencia práctica de programación, como la construcción de un parche visual-sonoro. Ahí es donde mi práctica con el software de arte multimedial Max/MSP/Jitter entró sin que yo la invitara explícitamente. Cuando desarrollo un parche o un patch en esos entornos de programación visual, no escribo código en el sentido clásico. Conecto nodos, modulo flujos de señales, defino rutas por donde circula la información. La lógica no es lineal sino relacional.</p>
+
+
+<figure class="terminal-img">
+    <img src="s3_i1.png" alt="Software de arte multimedial Max/MSP/jitter">
+    <figcaption>// FIG 08: Experimentación con mezclas de diferentes señales de video usando el entorno de programación Max/MSP/Jitter.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s3_i2.png" alt="Software de arte multimedial Max/MSP/jitter">
+    <figcaption>// FIG 09: Experimentos con diferentes grados de brillo, contraste y saturación en imagen fija con rotación de rueda de color de 360 grados en Max/MSP/Jitter.</figcaption>
+</figure>
+
+
+
+                <p>Un objeto recibe una señal, la transforma, la pasa. El resultado final no está en ningún nodo en particular, sino en la cadena, en la tensión entre los puntos de conexión. Un meta-prompt opera con la misma gramática al no pertenecer solamente a la configuración de una pregunta. La precisión del patch determina la calidad del output, y cualquier nodo mal configurado introduce ruido que contamina todo lo que viene después. Eso me cambió algo en la manera de relacionarme con herramientas como NotebookLM o Perplexity. Habían estado funcionando, lo reconozco, como una suerte de oráculo al que uno consulta y espera respuesta. Ahora los percibo como lo que son, es decir, como instrumentos de precisión que requieren una dedicada calibración.</p>
+                <p>¿Será que lo mismo aplica para todas las máquinas? Antes que revelar una “verdad”, la máquina debe ser calibrada, toda máquina, desde el fuego de la caverna y las pinturas de sus muros hasta las de tamaño molecular que atacan células infectadas por el cáncer. Antes de entregar el resultado se procesan los parámetros que uno diseña, así el investigador no interroga a la máquina: la afina. Para mi trabajo en arqueología de medios y música visual, esto tiene consecuencias metodológicas concretas. El análisis del estado del arte, la síntesis transversal de documentos, la identificación de genealogías conceptuales, todo ese trabajo puede operar con mayor rigor si asumo el rol de arquitecto del lenguaje y no de usuario pasivo.</p>
+
+
+<figure class="terminal-img">
+    <img src="s3_i3.png" alt="Software de arte multimedial Max/MSP/jitter">
+    <figcaption>// FIG 10: Experimentos con el algoritmo "Juego de la Vida" de Jitter que retienen frames de señales de video.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s3_i4.png" alt="Software de arte multimedial Max/MSP/jitter">
+    <figcaption>// FIG 11: Experimentos de subdivisión de pantallas implementado operaciones de matrices de video en Jitter.</figcaption>
+</figure>
+
+
+
+                <p>La IA como superficie de refracción controlada precisa que lo que controlo no es el resultado, sino las condiciones de la refracción. Pienso en Cámara Orafónica. El algoritmo de seguimiento ocular no produce imagen ni sonido por sí solo sino que responde a los parámetros que yo le di, a la lógica que construí, a las condiciones de escucha que diseñé en el espacio tanto virtual como físico. El espectador activa, pero la estructura previa determina cómo esa activación se traduce en experiencia. La conversación con la máquina, también allí, es una conversación diseñada. Lo que emerge de esta sesión no es una técnica nueva sino una actitud más consciente frente al instrumento, que puede hacer visible, con una velocidad y una exhaustividad que yo no tengo, aquello que mis propias preguntas le permiten ver. El investigador como arquitecto del lenguaje. El artista como calibrador de condiciones. Dos descripciones del mismo gesto.</p>
+
+
+<figure class="terminal-img">
+    <img src="s3_i4.png" alt="Video Sintetizador de Control Ocular Cámara Orafónica">
+    <figcaption>// FIG 12: Interacción con el video sintetizador de control ocular que hace parte de la obra Cámara Orafónica.</figcaption>
+</figure>
+
+
+
+
+            </div>
+
+            <div id="s4" class="sub-tab-content">
+                <h3>La materialización de la metodología MEASI</h3>
+                <p>El tránsito de la arquitectura teórica del prompt hacia la ejecución concreta de la metodología MEASI produjo algo que pocas veces ocurre en un seminario: la sensación de que una herramienta encaja. No porque sea simple, sino porque su lógica interna es coherente con la manera en que yo ya trabajo cuando construyo una pieza visual o sonora. El proceso iterativo, la acumulación por capas, la síntesis que emerge del roce entre fuentes, no son ajenas a mi práctica. Es exactamente lo que hago cuando desarrollo un patch en Max/MSP o cuando calibro la respuesta de Chromara frente a distintas condiciones de luz.</p>
+
+<figure class="terminal-img">
+    <img src="s4_i1.jpg" alt="Ensamble Cámara Orafónica">
+    <figcaption>// FIG 13: Pruebas de interacción con el video sintetizador de control ocular de la obra Cámara Orafónica.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s4_i3.jpg" alt="Ensamble Cámara Orafónica">
+    <figcaption>// FIG 14: Pruebas de interacción ocular con la obra Cámara Orafónica.</figcaption>
+</figure>
+
+
+
+                <p>La metodología me resultó la más reveladora. Interrogar un texto de manera recursiva a través del modelo no es resumirlo sino más bien diseccionarlo con otro tipo de instrumento. El LLM devuelve una imagen procesada del argumento, sus costuras, sus silencios, sus tensiones no resueltas, que una lectura directa, por atenta que sea, tarda semanas en construir. Lo llamo, y creo que el término es justo, una validación tipo espejo: el texto regresa transformado, y en esa transformación aparece lo que yo no había podido ver todavía. No porque la máquina comprenda más, sino porque opera sin los sesgos acumulados de mi propia lectura previa o desde fuera de mi punto ciego.</p>
+
+
+<figure class="terminal-img">
+    <img src="s3_i4.png" alt="Software de arte multimedial Max/MSP/jitter">
+    <figcaption>// FIG 15: Experimentos de subdivisión de pantallas implementado operaciones de matrices de video en Jitter.</figcaption>
+</figure>
+
+
+
+
+                <p>Para un proyecto enraizado en la arqueología de medios, eso tiene valor metodológico específico. Los textos de Siegfried Zielinski, Wolfgang Ernst o Jussi Parikka no se agotan en una lectura sino que se estratifican en múltiples capas de complejidades. Cada vuelta revela una capa nueva. La interacción recursiva con el modelo imita, en cierta medida, esa lógica geológica, mostrando que no se avanza linealmente sobre el texto, sino que se profundiza en él como si se estuviese en una excavación. La construcción de la matriz bibliográfica estructurada resolvió algo que venía postergando con cierta culpa. La parálisis por saturación de fuentes es real. En la etapa doctoral, el archivo crece más rápido que la capacidad de procesarlo, y la acumulación sin orden se convierte en ruido que no aporta. La matriz convierte esa dispersión en una base de datos coherente, donde cada texto es analizado bajo los mismos criterios de metadatos, hallazgos y brechas. El ecosistema de lectura deja de ser un cúmulo amorfo y adquiere una topología cercana, un terreno donde se puede pisar, y así, una topología se convierte en un mapa que puede ser navegado.</p>
+                <p>De nuevo pienso en Cámara Orafónica. La obra funciona porque el espacio de la instalación está estructurado. Hay parámetros, hay relaciones definidas entre el movimiento ocular del espectador y la respuesta sonora e icónica de la máquina. Sin esa arquitectura previa, la experiencia sería caos, no densidad. La matriz bibliográfica opera con la misma lógica, en el sentido que no elimina la complejidad, sino que la organiza para que pueda ser habitada. Las últimas fases de la metodología MEASI, presentan síntesis temática y triangulación de información, y definen el momento en que el campo de conocimiento deja de ser territorio ajeno y empieza a tener la forma de un argumento. Se visibilizan los hilos narrativos y emergen las tensiones conceptuales entre autores como líneas de fuerza que puedo trazar, cartografiar, intervenir. Y sobre ese mapa ya construido, mi propia voz como investigador-creador puede posicionarse con mayor precisión.</p>
+
+<figure class="terminal-img">
+    <img src="s4_i3.jpg" alt="Ensamble Cámara Orafónica">
+    <figcaption>// FIG 16: Pruebas de interacción ocular con la obra Cámara Orafónica.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s5_i1.jpg" alt="Cámara Orafónica en Bienal SUMA">
+    <figcaption>// FIG 17: Configurando la Cámara Orafónica para la Bienal de Investigación-Creación SUMA, Manizales, octubre 2025.</figcaption>
+</figure>
+
+
+                <p>NotebookLM, en este marco, deja de ser una herramienta de consulta para convertirse en un instrumento de filtrado transversal que me permite leer con mayor resolución. Lo que esta sesión dejó claro es que la metodología MEASI puede consolidar el estado del arte inicial de una investigación doctoral desde criterios rigurosos. Pero como toda buena amplificación, lo sé desde el trabajo con señales en mi taller, lo que se amplifica no es solo la señal, sino también el ruido. Por eso la postura crítica del investigador sigue siendo irreemplazable. La máquina afina, pero quien escucha y quien decide qué vale la pena escuchar sigo siendo yo.</p>
+            </div>
+
+
+
+
+            <div id="s5" class="sub-tab-content">
+                <h3>El Procesamiento de Lenguaje Natural como agente narrativo</h3>
+                <p>Hay algo significativo en que el cierre del seminario haya tomado la forma de exposiciones. No una clase magistral, sino cada quien mostrando cómo aterriza esto en su propio proyecto. Esa diferencia importa. La teoría se prueba cuando alguien tiene que habitarla en voz alta. Al preparar y presentar mi aproximación, el NLP adquirió la densidad de un instrumento de trabajo real. En un proyecto que indaga en las capas de la arqueología de medios, la posibilidad de trazar cartografías textuales a gran escala, identificando conexiones latentes entre autores, tensiones discursivas entre campos, genealogías conceptuales que atraviesan décadas de producción académica, las cualidades de la escala de lo que puedo ver cambian con mucha fuerza.</p>
+
+
+<figure class="terminal-img">
+    <img src="s5_i3.jpg" alt="módulos Chromara">
+    <figcaption>// FIG 18: Módulos de transformación de la luz, el color, y el movimiento para el experimento Chromara, DCN 2025.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s5_i4.jpg" alt="Pruebas de Proyección de Chromara">
+    <figcaption>// FIG 19: Pruebas de proyección de Chromara, DCN, 2025.</figcaption>
+</figure>
+
+
+
+                <p>La imagen que me surgió durante la exposición fue la del estroboscopio. En Chromara, el estroboscopio no ilumina continuamente sino que genera la ilusión de congelar el instante. A cierta frecuencia, el movimiento que sería invisible por su velocidad se vuelve legible, casi escultural. El NLP opera con una lógica análoga sobre el corpus documental, ya que la frecuencia del algoritmo detiene el flujo de información y hace visibles patrones narrativos que, bajo lectura directa y secuencial, vibrarían demasiado rápido para ser captados. No se ralentiza el pensamiento sino que lo hace estroboscópico al detener instantes medibles.</p>
+
+
+                <p>Pero esa revelación técnica trajo consigo algo que no esperaba, unas ganas inmensas de profundizar en las áreas de mi investigación con la mayor exigencia. La promesa de la IA coquetea permanentemente con la fantasía de la automatización total del pensamiento. Y es una fantasía seductora, especialmente en la etapa doctoral, cuando el archivo crece más rápido que la capacidad de procesarlo. Sin embargo, la arquitectura de la metodología MEASI es explícita al respecto. Por ejemplo, la Fase 6, la evaluación experta, la escritura final, la interpretación que cierra el ciclo, es un territorio estrictamente humano. El algoritmo no reemplaza al autor. Asume el rol de copiloto estructurado, y esa distinción no es menor.</p>
+                <p>Delegar el procesamiento masivo de datos a la máquina no reduce el trabajo crítico sino que lo desplaza y lo intensifica. Ya no se trata de recolectar y organizar fuentes, sino de validar con profundidad lo que el modelo devuelve, afinar los argumentos, triangular constantemente los resultados contra el juicio propio. La energía que antes se consumía en la gestión del archivo ahora se concentra en la interpretación. Y eso, lejos de simplificar el rol del investigador-creador, lo radicaliza y le devuelve el área de la disrupción real: la metodología de la investigación – creación como medio y modo de aporte para la generación del conocimiento nuevo[cite: 122, 123, 124, 125].</p>
+
+<figure class="terminal-img">
+    <img src="s5_i5.jpg" alt="reflectores Chromara">
+    <figcaption>// FIG 20: configuración final de reflectores de luz para el experimento Chromara, DCN, noviembre 2025.</figcaption>
+</figure>
+
+<figure class="terminal-img">
+    <img src="s5_i9.jpg" alt="reflectores Chromara">
+    <figcaption>// FIG 21: Presentación del Experimento Chromara, DCN, Noviembre 2025.</figcaption>
+</figure>
+<figure class="terminal-img">
+    <img src="s5_i10.jpg" alt="reflectores Chromara">
+    <figcaption>// FIG 22: Experimento Chromara, DCN, Noviembre 2025.</figcaption>
+</figure>
+
+
+                <p>Pienso en Cámara Orafónica una última vez en este ciclo. El algoritmo de seguimiento ocular lee la mirada del espectador y genera respuestas sonoras e icónicas en tiempo real. Pero el espacio de posibilidades que esa respuesta puede habitar, como los parámetros, las relaciones, las condiciones de escucha, los diseñé yo. La máquina ejecuta dentro de una arquitectura que tiene mi firma. Si esa arquitectura está mal pensada, ninguna precisión del algoritmo la salva. Si está bien construida, el algoritmo puede ir a lugares que yo solo no habría alcanzado. El NLP me entrega un mapa topográfico de las narrativas. Extrae conceptos, traza conexiones, señala densidades y vacíos. Pero la decisión de por dónde caminar, qué grietas abrir en la caja negra y qué postura asumir frente a lo que aparece, eso sigue siendo una artesanía. Una responsabilidad que no puedo ni quiero delegar. El seminario cierra aquí. Pero el proceso que abrió apenas empieza a sedimentarse.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // LÓGICA DE NAVEGACIÓN
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // --- ENCAPSULAMIENTO Y LÓGICA DE EXPERIMENTOS ---
+
+        // EXP 01: Excavación
+        (function() {
+            const target = "La arqueología de medios es una indisciplina itinerante";
+            const el = document.getElementById('w1-text');
+            const btnReset = document.getElementById('btn-reset-w1');
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+            let progress = 0;
+            let interval;
+            
+            function scramble() {
+                if(progress >= target.length) return;
+                let current = target.substring(0, progress);
+                for(let i = progress; i < target.length; i++) {
+                    current += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                el.innerText = current;
+            }
+            
+            function initW1() {
+                progress = 0;
+                el.style.color = "var(--term-green)";
+                clearInterval(interval);
+                interval = setInterval(scramble, 50);
+            }
+
+            function decrypt() {
+                if(progress < target.length) {
+                    progress += 1;
+                    scramble();
+                } else {
+                    el.style.color = "#fff";
+                    clearInterval(interval);
+                }
+            }
+
+            el.addEventListener('mousedown', decrypt);
+            el.addEventListener('mousemove', (e) => { if(e.buttons === 1) decrypt(); });
+            btnReset.addEventListener('click', initW1);
+            
+            initW1(); // Start on load
+        })();
+
+        // EXP 02: Dial Epistemológico (Flujo Dinámico)
+(function() {
+    const slider = document.getElementById('w2-slider');
+    const hexContainer = document.getElementById('w2-hex');
+    const fallText = document.getElementById('w2-falling');
+    const btnReset = document.getElementById('btn-reset-w2');
+
+    let isAnimating = true;
+    const hexChars = "0123456789ABCDEF!@#$*";
+
+    // Generador de matriz de datos caótica
+    function generateRandomHex() {
+        let str = "";
+        for(let i=0; i<40; i++) {
+            str += hexChars[Math.floor(Math.random() * hexChars.length)] + 
+                   hexChars[Math.floor(Math.random() * hexChars.length)] + " ";
+            if((i+1) % 8 === 0) str += "<br>"; // Saltos de línea para estructura de bloque
+        }
+        return str;
+    }
+
+    // Bucle recursivo que modula su velocidad (jitter) según el dial
+    function updateStream() {
+        if(!isAnimating) return;
+        let val = parseFloat(slider.value);
+
+        // La frecuencia de actualización se ralentiza al acercarse al 100%
+        let delay = 30 + (val * 3);
+
+        if (val < 90) {
+            hexContainer.innerHTML = generateRandomHex();
+        }
+
+        setTimeout(updateStream, delay);
+    }
+
+    // Control de cruce de señales (Crossfade)
+    function updateDial(val) {
+        if(val < 50) {
+            hexContainer.style.opacity = 1 - (val/50);
+            fallText.style.opacity = 0;
+            // El texto orgánico está distorsionado en el fondo
+            fallText.style.filter = `blur(${(50 - val) / 4}px)`; 
+            fallText.style.transform = `translateY(-20px) scale(0.9)`;
+        } else {
+            // A partir del 50%, la señal emerge
+            hexContainer.style.opacity = Math.max(0, 0.2 - ((val - 50) / 50));
+            let organicVal = (val - 50) / 50;
+            fallText.style.opacity = organicVal;
+            // El texto se enfoca y se acerca al usuario
+            fallText.style.filter = `blur(${(100 - val) / 10}px)`; 
+            fallText.style.transform = `translateY(0px) scale(${0.9 + (organicVal * 0.1)})`;
+        }
+
+        if(val >= 95) {
+            hexContainer.innerHTML = "[ SEÑAL ESTABILIZADA ]";
+        }
+    }
+
+    // Escuchadores de eventos
+    slider.addEventListener('input', (e) => updateDial(e.target.value));
+
+    btnReset.addEventListener('click', () => {
+        slider.value = 0;
+        updateDial(0);
+    });
+
+    // Iniciar el flujo de la máquina
+    updateStream();
+    updateDial(0);
+})();        // EXP 03: Sintonizador
+        (function() {
+            const canvas = document.getElementById('w3-canvas');
+            const ctx = canvas.getContext('2d');
+            const slider = document.getElementById('w3-slider');
+            const freqDisplay = document.getElementById('w3-freq');
+            const secret = document.getElementById('w3-secret');
+            const btnReset = document.getElementById('btn-reset-w3');
+            
+            // Set canvas resolution
+            canvas.width = canvas.parentElement.clientWidth || 600;
+            
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let val = parseFloat(slider.value);
+                let noiseLevel = Math.abs(104.2 - val) * 15; // Amp noise based on distance from 104.2
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#4ade80';
+                ctx.lineWidth = 2;
+                for(let i=0; i<canvas.width; i+=3) {
+                    let y = 50 + Math.sin(i * 0.05) * (10 + (noiseLevel*0.1)); // base wave + noise
+                    y += (Math.random() - 0.5) * noiseLevel;
+                    if(i==0) ctx.moveTo(i, y);
+                    else ctx.lineTo(i, y);
+                }
+                ctx.stroke();
+                requestAnimationFrame(draw);
+            }
+            draw();
+
+            function updateRadio(valStr) {
+                let val = parseFloat(valStr).toFixed(1);
+                freqDisplay.innerText = val + " MHz";
+                if(val === "104.2") {
+                    secret.style.opacity = 1;
+                    freqDisplay.style.color = "#fff";
+                } else {
+                    secret.style.opacity = 0;
+                    freqDisplay.style.color = "var(--term-green)";
+                }
+            }
+
+            slider.addEventListener('input', (e) => updateRadio(e.target.value));
+            
+            btnReset.addEventListener('click', () => {
+                slider.value = 80;
+                updateRadio(80);
+            });
+        })();
+
+        // EXP 04: Radar
+        (function() {
+            const radar = document.getElementById('w4-radar');
+            const output = document.getElementById('w4-output');
+            const btnReset = document.getElementById('btn-reset-w4');
+            const concepts = [
+                {x: 60, y: 50, text: "Topoi (Huhtamo)"},
+                {x: 180, y: 220, text: "Deep Time (Zielinski)"},
+                {x: 80, y: 240, text: "Machine Agency (Ernst)"}
+            ];
+
+            concepts.forEach(c => {
+                let d = document.createElement('div');
+                d.style.position = 'absolute';
+                d.style.left = c.x + 'px';
+                d.style.top = c.y + 'px';
+                d.style.width = '12px';
+                d.style.height = '12px';
+                d.style.backgroundColor = '#fff';
+                d.style.borderRadius = '50%';
+                d.style.opacity = '0';
+                d.style.transition = 'opacity 0.3s';
+                d.dataset.text = c.text;
+                d.classList.add('blip');
+                radar.appendChild(d);
+            });
+
+            radar.addEventListener('mousemove', (e) => {
+                const rect = radar.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                let found = false;
+                document.querySelectorAll('.blip').forEach(blip => {
+                    let bx = parseInt(blip.style.left) + 6;
+                    let by = parseInt(blip.style.top) + 6;
+                    let dist = Math.sqrt(Math.pow(mouseX - bx, 2) + Math.pow(mouseY - by, 2));
+                    
+                    if(dist < 40) { // Hover radius
+                        blip.style.opacity = '1';
+                        blip.style.boxShadow = '0 0 15px #fff';
+                        output.innerText = "HALLAZGO: " + blip.dataset.text;
+                        found = true;
+                    } else {
+                        blip.style.opacity = '0';
+                    }
+                });
+                if(!found) output.innerText = "[ESCANENADO VACÍO]";
+            });
+
+            btnReset.addEventListener('click', () => {
+                output.innerText = "[ESCANENADO VACÍO]";
+                document.querySelectorAll('.blip').forEach(b => b.style.opacity = '0');
+            });
+        })();
+
+        // EXP 05: Colisión Magnética
+        (function() {
+            const cont = document.getElementById('block-cont');
+            const prog = document.getElementById('block-prog');
+            const arena = document.getElementById('w5-arena');
+            const result = document.getElementById('w5-result');
+            const zone = document.getElementById('w5-zone');
+            const btnReset = document.getElementById('btn-reset-w5');
+            
+            let isDragging = false;
+            let offsetX = 0;
+            let offsetY = 0;
+
+            cont.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                const rect = cont.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+            });
+            
+            document.addEventListener('mouseup', () => isDragging = false);
+
+            document.addEventListener('mousemove', (e) => {
+                if(!isDragging) return;
+                const aRect = arena.getBoundingClientRect();
+                
+                let x = e.clientX - aRect.left - offsetX;
+                let y = e.clientY - aRect.top - offsetY;
+
+                // Bounds checking
+                x = Math.max(0, Math.min(x, arena.clientWidth - cont.clientWidth));
+                y = Math.max(0, Math.min(y, arena.clientHeight - cont.clientHeight));
+                
+                cont.style.left = x + 'px';
+                cont.style.top = y + 'px';
+
+                // Physics Repulsion (Progreso huye de Contingencia)
+                let px = parseInt(prog.style.left || 50);
+                let py = parseInt(prog.style.top || 50);
+                
+                // Centers
+                let cx = x + (cont.clientWidth/2);
+                let cy = y + (cont.clientHeight/2);
+                let pcx = px + (prog.clientWidth/2);
+                let pcy = py + (prog.clientHeight/2);
+
+                let dx = pcx - cx;
+                let dy = pcy - cy;
+                let distance = Math.sqrt(dx*dx + dy*dy);
+                
+                if(distance < 160) {
+                    let angle = Math.atan2(dy, dx);
+                    let push = 160 - distance;
+                    let newPx = px + Math.cos(angle) * push;
+                    let newPy = py + Math.sin(angle) * push;
+                    
+                    newPx = Math.max(0, Math.min(arena.clientWidth - prog.clientWidth, newPx));
+                    newPy = Math.max(0, Math.min(arena.clientHeight - prog.clientHeight, newPy));
+                    
+                    prog.style.left = newPx + 'px';
+                    prog.style.top = newPy + 'px';
+                }
+
+                // Win Condition Check
+                const zRect = zone.getBoundingClientRect();
+                const cRect = cont.getBoundingClientRect();
+                
+                // Center of Contingencia inside Zone
+                if( cx + aRect.left > zRect.left && cx + aRect.left < zRect.right && 
+                    cy + aRect.top > zRect.top && cy + aRect.top < zRect.bottom) {
+                    
+                    result.style.display = "block";
+                    cont.style.background = "#fff";
+                    isDragging = false; // drop it
+                }
+            });
+
+            btnReset.addEventListener('click', () => {
+                cont.style.left = '200px';
+                cont.style.top = '200px';
+                prog.style.left = '50px';
+                prog.style.top = '50px';
+                cont.style.background = 'var(--term-green)';
+                result.style.display = 'none';
+            });
+        })();
+
+// --- LÓGICA DE SUB-TABS (BITÁCORA) ---
+        function openSubTab(subTabId, event) {
+            // Ocultar todos los sub-contenidos
+            document.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
+            // Quitar clase activa de los botones sub-tab
+            document.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // Mostrar el seleccionado
+            document.getElementById(subTabId).classList.add('active');
+            // Activar visualmente el botón clickeado
+            if(event) event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>
